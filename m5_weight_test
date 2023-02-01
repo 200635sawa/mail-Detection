@@ -1,0 +1,159 @@
+import boto3
+import json
+import math
+from boto3 import Session
+
+
+cloudwatch = boto3.client('cloudwatch')
+BUCKET_NAME ='m5-weight-test'
+s3 = boto3.resource('s3')
+
+
+#セッション情報を設定
+def __setSession__():
+    session = Session(
+        aws_access_key_id = 'AKIAWZCXTHRFX6FAKS2S',
+        aws_secret_access_key = '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',
+        region_name = 'ap-northeast-1'
+    )
+    return session
+
+
+#s3にファイルをアップロードするメソッド
+def putS3(json_data,m5_api,bucket):
+    key = "m5-api/first.json"
+    object_key_name = key.replace("m5-api",m5_api)
+    obj = bucket.Object(object_key_name)
+    r = obj.put(Body = json.dumps(json_data))
+    return 0
+    
+    
+#s3のフォルダ内に前回のファイル(比較対象のファイル)があるかのチェックをするメソッド
+def check(bucket,m5_api,weight):
+    flag = True
+    try:
+        #s3バケットフォルダ内のファイルを取得
+        objs = bucket.meta.client.list_objects(Bucket = BUCKET_NAME,Prefix = m5_api)
+        for o in objs.get('Contents'):
+            #エラーを発生させるための適当な処理
+            file = o
+        flag = True
+
+        
+    except Exception as e:
+        #今回が初回の重さ検出の場合、比較対象の前回ファイルがないのでtry部分でNoTypeErrorが出る
+        print(e)
+        flag = False
+        pass
+    
+    if(flag == False):
+        #m5stack起動時はリセット前の変な数字が送られてくるのでweightが0のファイルを作成
+        json_data = {
+            'weight':0,
+            'APIKEY':m5_api
+        }
+        r = putS3(json_data,m5_api,bucket)
+    
+    return flag
+    
+
+
+#sample_function_to_lineを呼び出すメソッド
+def setResult(changes,result,APIKEY):
+    input_event = {
+        "changes":changes,
+        "result":result,
+        "APIKEY":APIKEY
+    }
+    Payload = json.dumps(input_event)
+    response = boto3.client('lambda').invoke(
+        FunctionName = "sample_function_to_line",
+        #FunctionName = "hantei-test",
+        InvocationType = "Event",
+        Payload = Payload
+    )
+    return 0
+
+
+#s3からファイルを取得するメソッド
+def getPrevWeight(
+    session:Session,
+    s3_bucket:str,
+    s3_prefix:str
+)->None:
+    
+    s3_session = session.resource('s3')
+    bucket = s3_session.Bucket(s3_bucket)
+    
+    s3_resource = boto3.resource('s3')
+    bucket_resource = s3.Bucket(s3_bucket)
+    objs = bucket_resource.meta.client.list_objects(Bucket = s3_bucket,Prefix = s3_prefix)
+    
+    #最新のファイルを取得
+    loop_first_f = True
+    for o in objs.get('Contents'):
+        if loop_first_f:
+            download_target_file = o.get('Key')
+            modified_datatime_mid = o.get('LastModified')
+            loop_first_f = False
+        else:
+            if(modified_datatime_mid <= o.get('LastModified')):
+                modified_datatime_mid = o.get('LastModified')
+                download_target_file = o.get('Key')
+    
+    try :
+        #最新ファイルの中身をjson形式で取り出す
+        target = bucket.Object(download_target_file).get()
+        body = target['Body'].read()
+        jsonbody = json.loads(body)
+        prevWeight = float(jsonbody["weight"])
+        return prevWeight
+    except Exception as e:
+        print(e)
+
+
+#今回値と前回値を比較して結果を確定するメソッド
+def judge(weight,prevWeight,m5_api):
+    APIKEY = m5_api
+    if((weight - prevWeight) > 1):
+        changes = "増"
+        result = float(weight - prevWeight)
+        
+    elif((prevWeight - weight) > 1):
+        changes ="減"
+        result = prevWeight - weight
+    else:
+        return 0
+    print("setResult")
+    r = setResult(changes,result,APIKEY)
+    return 0
+
+
+#このlambdaが呼び出されて最初に動くメソッド
+def lambda_handler(event,context):
+    request_id = context.aws_request_id
+    
+    weight = float(event['weight'])
+    weight = math.ceil(-0.08663125 * weight + 2810.126066408396)
+    print("weight>>>",weight)
+    
+    m5_api = str(event['APIKEY'])
+    print("get m5Data")
+    
+    bucket = s3.Bucket(BUCKET_NAME)
+    r = check(bucket,m5_api,weight)
+    #2回目の重量検知以降で動かす処理
+    if(r):
+        session = __setSession__()
+        s3_bucket = BUCKET_NAME
+        s3_prefix = m5_api
+        prevWeight = getPrevWeight(session,s3_bucket,s3_prefix)
+        print("prevWeight>>>",prevWeight)
+        r = judge(weight,prevWeight,m5_api)
+    
+        json_data = {
+            "weight": weight,
+            "APIKEY": m5_api
+        }
+        r = putS3(json_data,m5_api,bucket)
+        return 0
