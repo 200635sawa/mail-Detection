@@ -1,0 +1,104 @@
+import json
+import os
+import urllib.request
+import logging
+import sys
+import boto3
+import decimal
+from boto3.dynamodb.conditions import Key, Attr
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+LINE_CHANNEL_ACCESS_TOKEN   = os.environ['LINE_CHANNEL_ACCESS_TOKEN']
+
+def scan_proc(APIKEY):
+    dynamodb = boto3.resource('dynamodb')
+    
+    table = dynamodb.Table('UserTable')
+    
+    response = table.scan()
+    
+    for it in response['Items']:
+        APIKey = it['APIKey']
+        if(APIKey == APIKEY):
+            userId = it['userId']
+            return userId
+        
+
+
+def lambda_handler(event, context):
+    
+    logger.info(event)
+    
+    REQUEST_URL2 = 'https://api.line.me/v2/bot/message/push'
+    REQUEST_METHOD2 = 'POST'
+    REQUEST_HEADERS2 = {
+        'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN,
+        'Content-Type': 'application/json'
+    }
+    
+    #重さの変化（増・減・変化なし）
+    change = str(event['changes'])
+    #変化のg
+    result = float(event['result'])
+    #APIKey
+    APIKEY = str(event['APIKEY'])
+    print(APIKEY)
+    userId = scan_proc(APIKEY)
+    
+    if(change == "増"):
+        #増えた時の処理
+        REQUEST_MESSAGE2 = [
+            {
+                'type': 'text',
+                'text': '重さが'f'{result}g 増えたワン！'
+            },
+            {
+                'type': 'text',
+                'text': '郵便物が届いたかもしれないワン！'
+            }
+        ]
+        params = {
+            'to': userId,
+            'messages': REQUEST_MESSAGE2
+        }
+        request = urllib.request.Request(
+            REQUEST_URL2,
+            json.dumps(params).encode('utf-8'),
+            method=REQUEST_METHOD2,
+            headers=REQUEST_HEADERS2
+        )
+        response = urllib.request.urlopen(request, timeout=10)
+        return 0
+        
+    elif(change == "減"):
+        #減った時の処理
+        REQUEST_MESSAGE2 = [
+            {
+                'type': 'text',
+                'text': '重さが'f'{result}g 減ったワン！'
+            },
+            {
+                'type': 'text',
+                'text': '郵便物が取り出されたワン！'
+            }
+        ]
+        params = {
+            'to': userId,
+            'messages': REQUEST_MESSAGE2
+        }
+        request = urllib.request.Request(
+            REQUEST_URL2,
+            json.dumps(params).encode('utf-8'),
+            method=REQUEST_METHOD2,
+            headers=REQUEST_HEADERS2
+        )
+        response = urllib.request.urlopen(request, timeout=10)
+        return 0    
+        
+
+    
+        
+        
+            
+
