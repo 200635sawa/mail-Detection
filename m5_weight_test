@@ -20,9 +20,12 @@ def __setSession__():
 
 
 #s3にファイルをアップロードするメソッド
-def putS3(json_data,m5_api,bucket):
+def putS3(json_data,m5_api,bucket,flag):
     key = "m5-api/first.json"
-    object_key_name = key.replace("m5-api",m5_api)
+    if(flag):
+        object_key_name = key.replace("m5-api/first",m5_api)
+    else:
+        object_key_name = key.replace("m5-api",m5_api)
     obj = bucket.Object(object_key_name)
     r = obj.put(Body = json.dumps(json_data))
     return 0
@@ -52,7 +55,7 @@ def check(bucket,m5_api,weight):
             'weight':0,
             'APIKEY':m5_api
         }
-        r = putS3(json_data,m5_api,bucket)
+        r = putS3(json_data,m5_api,bucket,flag)
     
     return flag
     
@@ -134,7 +137,8 @@ def lambda_handler(event,context):
     request_id = context.aws_request_id
     
     weight = float(event['weight'])
-    weight = math.ceil(-0.08663125 * weight + 2810.126066408396)
+    #AIの線形回帰分析で求めた回帰式にweightを当てはめて補正なしの値から正しい値を求める(50gまでは正確に測れる)
+    weight = math.ceil(-0.07676217 * weight + 2491.137936356494)
     print("weight>>>",weight)
     
     m5_api = str(event['APIKEY'])
@@ -155,5 +159,6 @@ def lambda_handler(event,context):
             "weight": weight,
             "APIKEY": m5_api
         }
-        r = putS3(json_data,m5_api,bucket)
+        m5_api = m5_api + "/" +request_id
+        r = putS3(json_data,m5_api,bucket,flag=True)
         return 0
