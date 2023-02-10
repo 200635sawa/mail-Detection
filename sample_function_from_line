@@ -1,0 +1,200 @@
+import json
+import os
+import urllib.request
+import logging
+import sys
+import put
+import search
+import random
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+LINE_CHANNEL_ACCESS_TOKEN   = os.environ['LINE_CHANNEL_ACCESS_TOKEN']
+Pokemon = ["エレキボール","10まんボルト","チャージビーム","でんげきは","ボルトチェンジ","ワイルドボルト","ボルテッカー","はどうだん","とびげり","ドレインパンチ","インファイト","じこさいせい","まもる","でんこうせっか"]
+
+
+def lambda_handler(event, context):
+    
+    logger.info(event)
+    print("Event")
+    print(event)
+    print(event['body'])
+    REQUEST_URL2 = 'https://api.line.me/v2/bot/message/push'
+    REQUEST_METHOD2 = 'POST'
+    REQUEST_HEADERS2 = {
+        'Authorization': 'Bearer ' + LINE_CHANNEL_ACCESS_TOKEN,
+        'Content-Type': 'application/json'
+    }
+    
+    
+    body = json.loads(event['body'])
+    events = body["events"]
+    userId = events[0]["source"]["userId"]
+    type = events[0]['type']
+    
+    if((type == "follow") or(type == "unfollow")):
+        APIKey = ""
+        flag = 0
+        put.insert(userId, APIKey,flag)
+        return 0
+    
+    elif(type == "message"):
+        message_type = events[0]["message"]["type"]
+        ut = "ユーザー登録をしたい"
+        
+        
+        if(message_type == "text"):
+            me1 = events[0]["message"]["text"]
+            APIKey = events[0]["message"]["text"]
+            sample_value = search.search(userId)
+            print(sample_value)
+            if(me1 == ut):
+                
+                REQUEST_MESSAGE2 = [
+                    {
+                        'type': 'text',
+                        'text': 'APIKeyを送って欲しいワン！'
+                    }
+                ]
+                params = {
+                    'to': userId,
+                    'messages': REQUEST_MESSAGE2
+                }
+                request = urllib.request.Request(
+                    REQUEST_URL2,
+                    json.dumps(params).encode('utf-8'),
+                    method=REQUEST_METHOD2,
+                    headers=REQUEST_HEADERS2
+                )
+                response = urllib.request.urlopen(request, timeout=10)
+                
+                flag = 1
+                put.insert(userId, APIKey,flag)
+                return 0
+                
+                
+                
+            elif(sample_value == 1):
+                APIKey = events[0]["message"]["text"]
+                body = json.loads(event['body'])
+                events = body["events"]
+                me2 = events[0]["message"]["text"]
+                userId = events[0]["source"]["userId"]
+                if(me2 == "D9F93065" or me2 == "7FA974C0"):
+                    APIKey = events[0]["message"]["text"]
+                    flag = 0
+                    put.insert(userId, APIKey,flag)
+                    REQUEST_MESSAGE2 = [
+                        {
+                            'type': 'text',
+                            'text': 'APIKeyを登録したワン！'
+                        }
+                    ]
+                    params = {
+                        'to': userId,
+                        'messages': REQUEST_MESSAGE2
+                    }
+                    request = urllib.request.Request(
+                        REQUEST_URL2,
+                        json.dumps(params).encode('utf-8'),
+                        method=REQUEST_METHOD2,
+                        headers=REQUEST_HEADERS2
+                    )
+                    response = urllib.request.urlopen(request, timeout=10)
+                    
+                    return 0
+                    
+                else:
+                    REQUEST_MESSAGE2 = [
+                        {
+                            'type': 'text',
+                            'text': 'APIKeyを用意して出直してこいワン！'
+                        }
+                    ]
+                    params = {
+                        'to': userId,
+                        'messages': REQUEST_MESSAGE2
+                    }
+                    request = urllib.request.Request(
+                        REQUEST_URL2,
+                        json.dumps(params).encode('utf-8'),
+                        method=REQUEST_METHOD2,
+                        headers=REQUEST_HEADERS2
+                    )
+                    response = urllib.request.urlopen(request, timeout=10)
+                    
+                    return 0
+                    
+                
+            else:
+                length = len(Pokemon)
+                index = random.randint(0,length-1)
+                
+                waza = Pokemon[index]
+                waza = waza + "!"
+                REQUEST_MESSAGE2 = [
+                    {
+                        'type': 'text',
+                        'text': waza
+                    }
+                ]
+                params = {
+                    'to': userId,
+                    'messages': REQUEST_MESSAGE2
+                }
+                request = urllib.request.Request(
+                    REQUEST_URL2,
+                    json.dumps(params).encode('utf-8'),
+                    method=REQUEST_METHOD2,
+                    headers=REQUEST_HEADERS2
+                )
+                response = urllib.request.urlopen(request, timeout=10)
+                return 0
+            
+        elif(message_type == "sticker"):
+            userId = events[0]["source"]["userId"]
+            REQUEST_MESSAGE2 = [
+                {
+                    'type': 'text',
+                    'text': 'スタンプ送ってくんなワン！'
+                }
+            ]
+            
+            params = {
+                'to': userId,
+                'messages': REQUEST_MESSAGE2
+            }
+            request = urllib.request.Request(
+                REQUEST_URL2, 
+                json.dumps(params).encode('utf-8'), 
+                method=REQUEST_METHOD2, 
+                headers=REQUEST_HEADERS2
+            )
+            response = urllib.request.urlopen(request, timeout=10)
+            flag = 0
+            put.insert(userId, APIKey,flag)
+            return 0
+            
+        elif(message_type == "image"):
+            userId = events[0]["source"]["userId"]
+            REQUEST_MESSAGE2 = [
+                {
+                    'type': 'text',
+                    'text': '画像送ってくんなワン！'
+                }
+            ]
+                 
+            params = {
+            'to': userId,
+            'messages': REQUEST_MESSAGE2
+            }
+            request = urllib.request.Request(
+                REQUEST_URL2, 
+                json.dumps(params).encode('utf-8'), 
+                method=REQUEST_METHOD2, 
+                headers=REQUEST_HEADERS2
+            )
+            response = urllib.request.urlopen(request, timeout=10)
+            flag = 0
+            put.insert(userId, APIKey,flag)
+            return 0
